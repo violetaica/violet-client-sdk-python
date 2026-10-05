@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "violet-sdk"
+# Version is single-sourced from violet/__init__.py (__version__).
+# See [tool.hatch.version] below — do NOT re-add a static `version` here.
+dynamic = ["version"]
+description = "Python SDK for the Violet Messages API with keyless (Auth0, API key) authentication."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Violet" }]
+keywords = ["violet", "messages", "llm", "auth0", "oauth", "pkce"]
+# Zero runtime dependencies — standard library only.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest"]
+web = ["fastapi", "uvicorn[standard]"]
+async = ["aiohttp"]
+
+[project.urls]
+Homepage = "https://github.com/violetaica/violet-client-sdk-python"
+Changelog = "https://github.com/violetaica/violet-client-sdk-python/blob/main/CHANGELOG.md"
+
+# Single source of truth for the version: violet/__init__.py.
+[tool.hatch.version]
+path = "violet/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["violet"]

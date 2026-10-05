@@ -69,20 +69,11 @@ function Get-WheelMetadata([string]$WheelPath) {
     }
 }
 
-function Get-WheelEntryText([string]$WheelPath, [string]$Suffix) {
+function Get-WheelEntries([string]$WheelPath) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem | Out-Null
     $zip = [System.IO.Compression.ZipFile]::OpenRead($WheelPath)
     try {
-        $entry = $zip.Entries | Where-Object { $_.FullName -like $Suffix } | Select-Object -First 1
-        if (-not $entry) {
-            return ""
-        }
-        $reader = New-Object System.IO.StreamReader($entry.Open())
-        try {
-            return $reader.ReadToEnd()
-        } finally {
-            $reader.Dispose()
-        }
+        return @($zip.Entries | ForEach-Object { $_.FullName })
     } finally {
         $zip.Dispose()
     }
@@ -190,10 +181,12 @@ try {
     Assert-True (-not (Test-StaticProjectVersion $Pyproject)) `
         "no static [project] version in pyproject.toml (version stays single-sourced)"
 
-    Write-Step "Import name is violet (dist name != import name)"
-    $TopLevel = (Get-WheelEntryText $Wheel.FullName "*.dist-info/top_level.txt").Trim()
-    Assert-True ($TopLevel -eq "violet") `
-        "wheel top_level.txt = violet (import name unchanged by the dist name)"
+    Write-Step "Import package is violet (dist name != import name)"
+    # Hatchling no longer ships setuptools-style top_level.txt; verify the
+    # package directory is in the wheel instead.
+    $Entries = Get-WheelEntries $Wheel.FullName
+    Assert-True ([bool]($Entries -contains "violet/__init__.py")) `
+        "wheel contains violet/__init__.py (import name unchanged by the dist name)"
 
     Write-Step "Install wheel into clean venv"
     & $Python -m venv $VenvDir
@@ -207,8 +200,11 @@ try {
 
     if (-not $SkipTests) {
         Write-Step "Offline tests (no network)"
-        & $VenvPython -m pip install --no-deps -e "$RepoRoot[dev]"
+        # Allow deps so [dev] pulls pytest. Runtime deps are empty, so this stays lean.
+        & $VenvPython -m pip install -e "$RepoRoot[dev]"
         Assert-True ($LASTEXITCODE -eq 0) "editable install $DistName[dev]"
+        & $VenvPython -c "import pytest; print('pytest', pytest.__version__)"
+        Assert-True ($LASTEXITCODE -eq 0) "pytest available in venv"
         Push-Location $RepoRoot
         try {
             & $VenvPython -m pytest tests -q
